@@ -8,6 +8,7 @@ import redis.asyncio as redis
 from common.config import settings
 from fastapi import HTTPException
 from pydantic import BaseModel
+from pymongo import ReturnDocument
 
 
 # Initialize Firebase Admin SDK
@@ -34,3 +35,27 @@ async def login(body: LoginIn):
         raise HTTPException(401, 'Invalid Google token')
     
     uid = decoded['uid']
+
+@app.post('/login')
+async def login(body: LoginIn):
+    try:
+        decoded = fb_auth.verify_id_token(body.id_token)
+    except Exception:
+        raise HTTPException(401, 'Invalid Google token')
+    
+    uid = decoded['uid']
+    
+    # Upsert user info and assign starter credits if new
+    user = await users.find_one_and_update(
+        {'_id': uid},
+        {
+            '$set': {
+                'email': decoded.get('email'), 
+                'name': decoded.get('name'),
+                'photo': decoded.get('picture')
+            },
+            '$setOnInsert': {'credits': 50}
+        },
+        upsert=True, 
+        return_document=ReturnDocument.AFTER
+    )
