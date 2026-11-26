@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI
 from common.config import settings
 from langgraph.graph import MessagesState
+from langchain_core.messages import SystemMessage
 
 
 def model(name: str) -> ChatOpenAI:
@@ -22,3 +23,7 @@ class State(MessagesState):
 
 def route(state: State) -> str:
     return state['agent']
+
+async def chat_node(state: State):
+    sys = SystemMessage('You are a helpful assistant. Be clear and concise.')
+    return {'messages': [await deepseek.ainvoke([sys] + state['messages'])]}
