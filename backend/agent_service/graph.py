@@ -6,6 +6,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_tavily import TavilySearch
 from langchain_core.messages import HumanMessage
 from . import rag
+from langchain_core.messages import AIMessage
+from .ppt import build_deck
 
 def model(name: str) -> ChatOpenAI:
     return ChatOpenAI(
@@ -62,3 +64,6 @@ async def pdf_node(state: State):
     sys = SystemMessage('Answer only from this document context. If it is not there, say so.\n\n' + context)
     return {'messages': [await deepseek.ainvoke([sys] + state['messages'])]}
 
+async def ppt_node(state: State):
+    link = await build_deck(state['messages'][-1].content, state['user_id'])
+    return {'messages': [AIMessage('Your presentation is ready: ' + link)]}
