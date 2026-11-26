@@ -41,3 +41,9 @@ async def send(chat_id: str, body: MessageIn, uid: str = Depends(get_user_id)):
         'agent': body.agent, 
         'created_at': now()
     })
+    
+# Fetch up to the last 50 messages for context
+    rows = await db.messages.find({'chat_id': chat_id, 'user_id': uid}
+    ).sort('created_at', 1).to_list(50)
+    
+    history = [{'role': m['role'], 'content': m['content']} for m in rows]
