@@ -6,6 +6,7 @@ from langchain_openai import OpenAIEmbeddings
 from qdrant_client import AsyncQdrantClient
 from common.config import settings
 from qdrant_client.models import VectorParams, Distance
+from qdrant_client.models import PointStruct
 
 COLLECTION = 'documents'
 
@@ -39,3 +40,24 @@ async def ingest(user_id: str, filename: str, data: bytes) -> str:
     
     # Split text into chunks
     chunks = splitter.split_text(text)
+
+async def ingest(user_id: str, filename: str, data: bytes) -> str:
+    file_id = uuid.uuid4().hex
+    await asyncio.to_thread(s3.put_object, Bucket=settings.s3_bucket, Key=f'uploads/{user_id}/{file_id}.pdf', Body=data)
+    text = '\n'.join(p.extract_text() or '' for p in PdfReader(io.BytesIO(data)).pages)
+    chunks = splitter.split_text(text)
+    
+    # Generate vector embeddings
+    vectors = await emb.aembed_documents(chunks)
+    await ensure_collection()
+    
+    # Upsert points with payload metadata into Qdrant
+    await qdrant.upsert(COLLECTION, points=[
+        PointStruct(
+            id=str(uuid.uuid4()), 
+            vector=v,
+            payload={'user_id': user_id, 'file_id': file_id, 'text': c}
+        )
+        for c, v in zip(chunks, vectors)
+    ])
+    return file_id
