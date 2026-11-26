@@ -47,3 +47,33 @@ async def send(chat_id: str, body: MessageIn, uid: str = Depends(get_user_id)):
     ).sort('created_at', 1).to_list(50)
     
     history = [{'role': m['role'], 'content': m['content']} for m in rows]
+    
+async def stream():
+        parts = []
+        payload = {
+            'messages': history, 
+            'agent': body.agent,
+            'file_id': body.file_id, 
+            'image': body.image
+        }
+        
+        async with httpx.AsyncClient(timeout=None) as c:
+            async with c.stream('POST', f'{settings.agent_url}/run', json=payload, headers={'X-User-Id': uid}) as resp:
+                async for line in resp.aiter_lines():
+                    if not line.startswith('data: '):
+                        continue
+                    evt = json.loads(line[6:])
+                    if evt['type'] == 'token':
+                        parts.append(evt['text'])
+                    yield line + '\n\n'
+                    
+        await db.messages.insert_one({
+            'chat_id': chat_id, 
+            'user_id': uid,
+            'role': 'assistant', 
+            'content': ''.join(parts), 
+            'agent': body.agent,
+            'created_at': now()
+        })
+        
+        return StreamingResponse(stream(), media_type='text/event-stream')
