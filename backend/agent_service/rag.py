@@ -7,6 +7,7 @@ from qdrant_client import AsyncQdrantClient
 from common.config import settings
 from qdrant_client.models import VectorParams, Distance
 from qdrant_client.models import PointStruct
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 COLLECTION = 'documents'
 
@@ -61,3 +62,19 @@ async def ingest(user_id: str, filename: str, data: bytes) -> str:
         for c, v in zip(chunks, vectors)
     ])
     return file_id
+
+
+async def retrieve(user_id: str, file_id: str, question: str) -> str:
+    qv = await emb.aembed_query(question)
+    
+    res = await qdrant.query_points(
+        COLLECTION, 
+        query=qv, 
+        limit=4,
+        query_filter=Filter(must=[
+            FieldCondition(key='user_id', match=MatchValue(value=user_id)),
+            FieldCondition(key='file_id', match=MatchValue(value=file_id))
+        ])
+    )
+    
+    return '\n---\n'.join(p.payload['text'] for p in res.points)
