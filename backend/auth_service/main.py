@@ -9,6 +9,7 @@ from common.config import settings
 from fastapi import HTTPException
 from pydantic import BaseModel
 from pymongo import ReturnDocument
+from fastapi import Header
 
 
 # Initialize Firebase Admin SDK
@@ -103,3 +104,9 @@ async def login(body: LoginIn):
             'credits': user['credits']
         }
     }
+
+@app.post('/logout')
+async def logout(authorization: str = Header()):
+    token = authorization.removeprefix("Bearer").strip()
+    await r.delete(f'session:{token}')
+    return {'ok': True}
