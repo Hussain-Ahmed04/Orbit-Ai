@@ -5,6 +5,8 @@ from common.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 import jwt
 from fastapi import Request, HTTPException
+from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 app = FastAPI(title='gateway')
 
@@ -46,3 +48,35 @@ BLOCKED = {'billing/credits/deduct'} # internal only
 
 SKIP_REQ = {'host', 'content-length', 'connection', 'x-user-id'}
 SKIP_RES = {'transfer-encoding', 'connection'}
+
+
+@app.api_route('/api/{service}/{path:path}', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+async def proxy(service: str, path: str, request: Request):
+    base = SERVICES.get(service)
+    if not base:
+        raise HTTPException(404, 'Unknown service')
+        
+    key = f'{service}/{path}'
+    if key in BLOCKED:
+        raise HTTPException(403, 'Forbidden')
+        
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in SKIP_REQ}
+    
+    if key not in PUBLIC:
+        headers['x-user-id'] = await authenticate(request)
+        
+    req = http.build_request(
+        request.method, f'{base}/{path}',
+        params=request.query_params, 
+        headers=headers,
+        content=await request.body()
+    )
+    
+    resp = await http.send(req, stream=True)
+    
+    return StreamingResponse(
+        resp.aiter_raw(), 
+        status_code=resp.status_code,
+        headers={k: v for k, v in resp.headers.items() if k.lower() not in SKIP_RES},
+        background=BackgroundTask(resp.aclose)
+    )
