@@ -40,3 +40,9 @@ async def authenticate(request: Request) -> str:
         raise HTTPException(401, 'Session expired')
         
     return claims['sub']
+
+PUBLIC = {'auth/login'}
+BLOCKED = {'billing/credits/deduct'} # internal only
+
+SKIP_REQ = {'host', 'content-length', 'connection', 'x-user-id'}
+SKIP_RES = {'transfer-encoding', 'connection'}
