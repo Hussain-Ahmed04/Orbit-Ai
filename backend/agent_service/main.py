@@ -4,6 +4,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from common.deps import get_user_id
 from .graph import graph
+from fastapi import UploadFile, File
+from . import rag
 
 app = FastAPI(title='agent')
 
@@ -42,3 +44,8 @@ async def run(body: RunIn, uid: str = Depends(get_user_id)):
         yield frame({'type': 'done'})
         
     return StreamingResponse(gen(), media_type='text/event-stream')
+
+@app.post('/pdf/upload')
+async def upload(file: UploadFile = File(...), uid: str = Depends(get_user_id)):
+    file_id = await rag.ingest(uid, file.filename, await file.read())
+    return {'file_id': file_id, 'name': file.filename}
