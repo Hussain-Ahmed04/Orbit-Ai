@@ -77,3 +77,4 @@ async def stream():
         })
         
         return StreamingResponse(stream(), media_type='text/event-stream')
+    
