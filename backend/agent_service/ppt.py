@@ -36,3 +36,10 @@ async def build_deck(topic: str, user_id: str) -> str:
         Key=key, 
         Body=buf.getvalue()
     )
+    
+    return await asyncio.to_thread(
+            s3.generate_presigned_url, 
+            'get_object',
+            Params={'Bucket': settings.s3_bucket, 'Key': key}, 
+            ExpiresIn=3600
+        )
