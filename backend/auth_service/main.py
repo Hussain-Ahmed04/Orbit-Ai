@@ -59,3 +59,47 @@ async def login(body: LoginIn):
         upsert=True, 
         return_document=ReturnDocument.AFTER
     )
+    
+@app.post('/login')
+async def login(body: LoginIn):
+    try:
+        decoded = fb_auth.verify_id_token(body.id_token)
+    except Exception:
+        raise HTTPException(401, 'Invalid Google token')
+    
+    uid = decoded['uid']
+    user = await users.find_one_and_update(
+        {'_id': uid},
+        {
+            '$set': {
+                'email': decoded.get('email'), 
+                'name': decoded.get('name'),
+                'photo': decoded.get('picture')
+            },
+            '$setOnInsert': {'credits': 50}
+        },
+        upsert=True, 
+        return_document=ReturnDocument.AFTER
+    )
+    
+    now = int(time.time())
+    
+    # Generate JWT and cache session in Redis
+    token = jwt.encode(
+        {'sub': uid, 'iat': now, 'exp': now + settings.jwt_ttl}, 
+        settings.jwt_secret, 
+        algorithm='HS256'
+    )
+    
+    await r.set(f'session:{token}', uid, ex=settings.jwt_ttl)
+    
+    return {
+        'token': token, 
+        'user': {
+            'id': uid, 
+            'email': user['email'], 
+            'name': user['name'], 
+            'photo': user['photo'], 
+            'credits': user['credits']
+        }
+    }
