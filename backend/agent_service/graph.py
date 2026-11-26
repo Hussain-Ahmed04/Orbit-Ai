@@ -35,3 +35,12 @@ search_agent = create_react_agent(
     [TavilySearch(max_results=4)],
     prompt='Search the web when facts may be recent. Cite source URLs.'
 )
+
+CODING_PROMPT = (
+    'You are a senior engineer. Reply with a short explanation and exactly one '
+    'fenced code block (HTML, CSS and JS in a single file when it is a web page).'
+)
+
+async def coding_node(state: State):
+    sys = SystemMessage(CODING_PROMPT)
+    return {'messages': [await deepseek.ainvoke([sys] + state['messages'])]}
