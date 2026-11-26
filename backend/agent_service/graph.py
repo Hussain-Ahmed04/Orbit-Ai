@@ -5,6 +5,7 @@ from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_tavily import TavilySearch
 from langchain_core.messages import HumanMessage
+from . import rag
 
 def model(name: str) -> ChatOpenAI:
     return ChatOpenAI(
@@ -53,3 +54,11 @@ async def vision_node(state: State):
         {'type': 'image_url', 'image_url': {'url': state['image']}}
     ])
     return {'messages': [await gpt.ainvoke(state['messages'][:-1] + [msg])]}
+
+
+async def pdf_node(state: State):
+    question = state['messages'][-1].content
+    context = await rag.retrieve(state['user_id'], state['file_id'], question)
+    sys = SystemMessage('Answer only from this document context. If it is not there, say so.\n\n' + context)
+    return {'messages': [await deepseek.ainvoke([sys] + state['messages'])]}
+
