@@ -23,3 +23,19 @@ async def ensure_collection():
             vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
         )
 
+async def ingest(user_id: str, filename: str, data: bytes) -> str:
+    file_id = uuid.uuid4().hex
+    
+    # Upload original PDF to S3 asynchronously
+    await asyncio.to_thread(
+        s3.put_object, 
+        Bucket=settings.s3_bucket,
+        Key=f'uploads/{user_id}/{file_id}.pdf', 
+        Body=data
+    )
+    
+    # Extract text from all pages
+    text = '\n'.join(p.extract_text() or '' for p in PdfReader(io.BytesIO(data)).pages)
+    
+    # Split text into chunks
+    chunks = splitter.split_text(text)
