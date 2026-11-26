@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage
 from . import rag
 from langchain_core.messages import AIMessage
 from .ppt import build_deck
+from langgraph.graph import StateGraph, START, END
 
 def model(name: str) -> ChatOpenAI:
     return ChatOpenAI(
@@ -67,3 +68,22 @@ async def pdf_node(state: State):
 async def ppt_node(state: State):
     link = await build_deck(state['messages'][-1].content, state['user_id'])
     return {'messages': [AIMessage('Your presentation is ready: ' + link)]}
+
+g = StateGraph(State)
+
+for name, fn in [
+    ('chat', chat_node), 
+    ('search', search_agent), 
+    ('coding', coding_node),
+    ('vision', vision_node), 
+    ('pdf', pdf_node), 
+    ('ppt', ppt_node)
+]:
+    g.add_node(name, fn)
+
+g.add_conditional_edges(START, route)
+
+for name in ['chat', 'search', 'coding', 'vision', 'pdf', 'ppt']:
+    g.add_edge(name, END)
+
+graph = g.compile()
