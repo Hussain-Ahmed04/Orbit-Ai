@@ -4,7 +4,7 @@ from langgraph.graph import MessagesState
 from langchain_core.messages import SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langchain_tavily import TavilySearch
-
+from langchain_core.messages import HumanMessage
 
 def model(name: str) -> ChatOpenAI:
     return ChatOpenAI(
@@ -44,3 +44,12 @@ CODING_PROMPT = (
 async def coding_node(state: State):
     sys = SystemMessage(CODING_PROMPT)
     return {'messages': [await deepseek.ainvoke([sys] + state['messages'])]}
+
+
+async def vision_node(state: State):
+    question = state['messages'][-1].content
+    msg = HumanMessage(content=[
+        {'type': 'text', 'text': question},
+        {'type': 'image_url', 'image_url': {'url': state['image']}}
+    ])
+    return {'messages': [await gpt.ainvoke(state['messages'][:-1] + [msg])]}
